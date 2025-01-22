@@ -25,7 +25,7 @@ on:
       - synchronize
   push:
     branches:
-      - master
+      - arm
   schedule:
     - cron: "0 13 * * *"  # Run daily at 1PM UTC.
 
@@ -101,6 +101,58 @@ jobs:
 
       - name: Build Linux Client
         run: npm run action client/electron/build linux
+
+  linux_arm64_debug_build:
+    name: Linux arm64 Debug Build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    needs: [web_test, backend_test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.3.4
+
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ./package-lock.json
+
+      - name: Install NPM Dependencies
+        run: |
+          sudo apt update && sudo apt install chromium-browser
+          npm ci
+
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: '${{ github.workspace }}/go.mod'
+
+      - name: Replace x86_64 OutlineProxyController
+        run: |
+          sudo apt install gcc ninja-build libboost1.83-dev libboost-json1.83-dev libboost-regex1.83-dev libboost-program-options1.83-dev libboost-filesystem1.83-dev libboost-coroutine1.83-dev
+          mkdir client/electron/linux_proxy_controller/build && cd client/electron/linux_proxy_controller/build
+          cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-static -static-libgcc -static-libstdc++"
+          ninja
+          cp OutlineProxyController ../dist/
+          file ../dist/OutlineProxyController
+
+      - name: Build Linux Client
+        # electron-builder has no arm64 version fpm, so install it from
+        # gem and force to use system one. Based on this workaround:
+        # https://github.com/jordansissel/fpm/issues/1801#issuecomment-919877499
+        run: |
+          sudo apt install ruby
+          sudo gem install fpm
+          export USE_SYSTEM_FPM=true && export GEM_HOME="$(ruby -e 'puts Gem.user_dir')" && export PATH="$PATH:$GEM_HOME/bin"
+          npm run action client/electron/build linux_arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@main
+        with:
+          name: Outline-Client.AppImage
+          path: output/client/electron/build/*.AppImage
+          compression-level: 9
 
   windows_debug_build:
     name: Windows Debug Build
