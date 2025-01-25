@@ -25,7 +25,7 @@ on:
       - synchronize
   push:
     branches:
-      - master
+      - arm
 
 jobs:
   lint:
