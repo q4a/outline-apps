@@ -162,6 +162,13 @@ jobs:
       - name: Build Client
         run: npm run action client/electron/build ${{ matrix.platform }} -- --arch ${{ matrix.arch }}
 
+      - name: Upload Linux arm64 build
+        if: matrix.useSystemFpm
+        uses: actions/upload-artifact@v7
+        with:
+          name: outline.${{ matrix.platform }}.${{ matrix.arch }}.zip
+          path: output/client/electron/build/*.deb
+
   macos_debug_build:
     name: MacOS Debug Build
     runs-on: macos-15
